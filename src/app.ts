@@ -14,8 +14,6 @@ async function startServer() {
       {
         key: fs.readFileSync("./security/server.key"),
         cert: fs.readFileSync("./security/server.cert"),
-        passphrase: "mihiru",
-        rejectUnauthorized: false,
       },
       app
     )

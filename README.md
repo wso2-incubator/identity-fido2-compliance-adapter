@@ -14,7 +14,7 @@
 
 ## Installation
 
-fido2-compliance-adapter requires [Node.js](https://nodejs.org/) to run.
+fido2-compliance-adapter requires **Node.js** to run.
 
 Clone the Github Project
 
@@ -42,3 +42,21 @@ Start the Adapter
 ```sh
 npm start
 ```
+
+### Add Certificates
+
+Install **openssl**
+
+Generate Certificate
+
+```sh
+cd /security
+openssl req -nodes -new -x509 -keyout server.key -out server.cert
+```
+
+Allow unauthorized TLS
+```sh
+export NODE_TLS_REJECT_UNAUTHORIZED='0'
+```
+
+Restart server
