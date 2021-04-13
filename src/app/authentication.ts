@@ -6,8 +6,8 @@ import querystring from "querystring";
 import encode from "nodejs-base64-encode";
 
 let config = require("./../../config.json");
-let requestId;
-let sessionDataKey;
+let requestId: any;
+let sessionDataKey: any;
 let host = "localhost";
 let auth: any;
 
@@ -67,12 +67,7 @@ export default ({ app }: { app: express.Application }) => {
           challenge: data.publicKeyCredentialRequestOptions.challenge,
           timeout: 20000,
           rpId: data.publicKeyCredentialRequestOptions.rpId,
-          allowCredentials: [
-            // {
-            //     id: "m7xl_TkTcCe0WcXI2M-4ro9vJAuwcj4m",
-            //     type: "public-key"
-            // }
-          ],
+          allowCredentials: [],
           userVerification:
             data.publicKeyCredentialRequestOptions.userVerification,
         };
@@ -83,7 +78,7 @@ export default ({ app }: { app: express.Application }) => {
       .catch((error) => {
         res.send({
           status: "failed",
-          errorMessage: "error.response.data.description",
+          errorMessage: "",
         });
       });
   });
@@ -122,12 +117,10 @@ export default ({ app }: { app: express.Application }) => {
         }
       )
       .then(async (response) => {
-        console.log(response);
-
         if (response.request.path == "/pickup-dispatch/index.jsp") {
           res.send({
             status: "failed",
-            errorMessage: "sample description",
+            errorMessage: "",
           });
         } else {
           res.send({
@@ -135,44 +128,11 @@ export default ({ app }: { app: express.Application }) => {
             errorMessage: "",
           });
         }
-
-        // var headers: any = response.request._header;
-
-        // var sessionDataKeyConsent = headers
-        //   .split("?")[1]
-        //   .split("&")[3]
-        //   .split("=")[1];
-
-        // var x = await axios.post(
-        //   `https://${host}:9443/oauth2/authorize`,
-        //   querystring.stringify({
-        //     sessionDataKeyConsent: sessionDataKeyConsent,
-        //     consent: "approve",
-        //   }),
-        //   {
-        //     headers: //response.headers
-        //     {
-        //       "Content-Type": "application/x-www-form-urlencoded",
-        //       Authorization: `Basic ${auth}`,
-        //     },
-        //   }
-        // );
-
-        // console.log(x);
-        //   if(l == 10){
-        //     console.log('exiting')
-        //     process.exit()
-        // }
-        // l=l+1;
       })
       .catch((error) => {
-        console.log(
-          "=======================error==============================="
-        );
-        console.log(error);
         res.send({
           status: "failed",
-          errorMessage: "error",
+          errorMessage: "",
         });
       });
   });

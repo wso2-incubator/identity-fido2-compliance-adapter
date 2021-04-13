@@ -46,8 +46,7 @@ export default async ({ app }: { app: express.Application }) => {
     }
     metaCache.set("statements", statements, 100000);
   } catch (error) {
-    console.error(`RP - attestation: ${error.message}`);
-    // return res.status(400).send({ errorMessage: error.message });
+    console.error(`${error.message}`);
   }
 
   /**
@@ -76,10 +75,9 @@ export default async ({ app }: { app: express.Application }) => {
     .finally(() => {
       if (statements.length) {
         console.log(
-          `ℹ️  Initializing metadata service with ${statements.length} local statements`
+          `ℹInitializing metadata service with ${statements.length} local statements`
         );
       }
-
       console.log("FIDO Conformance routes ready");
     });
 };
