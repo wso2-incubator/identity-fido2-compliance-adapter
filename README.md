@@ -30,9 +30,12 @@ npm install
 ```
 
 Add Sample App ID to the adapter
-        - Open  `config.json`
-        - Change sampleAppId to your sample app id
-        - Change the other configurations if needed
+
+```sh
+Open  `config.json`
+Change sampleAppId to your sample app id
+Change the other configurations if needed
+```
 
 Start the Adapter
 
