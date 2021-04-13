@@ -2,3 +2,5 @@
 /documents.txt
 /src/app/fido-conformance-mds/*
 /src/app/extensions.py
+/security/server.cert
+/security/server.key

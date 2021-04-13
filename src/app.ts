@@ -12,8 +12,8 @@ async function startServer() {
   https
     .createServer(
       {
-        key: fs.readFileSync("./security/key.pem"),
-        cert: fs.readFileSync("./security/cert.pem"),
+        key: fs.readFileSync("./security/server.key"),
+        cert: fs.readFileSync("./security/server.cert"),
         passphrase: "mihiru",
         rejectUnauthorized: false,
       },
