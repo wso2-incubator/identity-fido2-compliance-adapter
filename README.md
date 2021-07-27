@@ -1,4 +1,4 @@
-# identity-fido2-compliance-adapter
+# Identity fido2 compliance adapter
 
 ## Features
 
