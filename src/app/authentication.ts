@@ -33,7 +33,7 @@ export default ({ app }: { app: express.Application }) => {
 
     auth = encode.encode(`${req.body.username}:password`, "base64");
 
-    var url = `https://${host}:9443/oauth2/authorize?scope=openid&response_type=code&redirect_uri=http://localhost.com:8080/pickup-dispatch/oauth2client&client_id=${client_id}`;
+    var url = `https://${host}:9443/oauth2/authorize?scope=openid&response_type=code&redirect_uri=https://oidcdebugger.com/debug&client_id=${client_id}`;
 
     // start-authentication
     return await axios({

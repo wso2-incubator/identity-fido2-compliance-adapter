@@ -21,6 +21,8 @@ let config = require("./../../config.json");
 
 var challenge: any;
 var auth: any;
+var authClient: any;
+var token: any;
 
 export default ({ app }: { app: express.Application }) => {
   /**
@@ -68,6 +70,27 @@ export default ({ app }: { app: express.Application }) => {
       });
     });
 
+    console.log(`Username: ` + userData.userName);
+    console.log(`attestationClaim: ` + userData.attestationClaim);
+
+
+    authClient = encode.encode(`${config.sampleAppId}:${config.clientSecret}`, "base64");
+
+    // password grant call
+    await axios({
+      method: "post",
+      url: `https://${config.host}:9443/oauth2/token?grant_type=password&username=${userData.userName}&password=${userData.password}&scope=internal_login`,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${authClient}`,
+      }
+    }).then((response) => {
+      token = response.data["access_token"];
+      console.log('token------------', token);
+    }).catch((error) => {
+      console.log("Error", error);
+    })
+
     auth = encode.encode(`${userData.userName}:${userData.password}`, "base64");
 
     if (
@@ -75,16 +98,22 @@ export default ({ app }: { app: express.Application }) => {
       req.body.authenticatorSelection.requireResidentKey == false
     ) {
       // start-registration
+      // console.log('auth: ', auth);
       await axios({
         method: "post",
         url: `https://${config.host}:9443/api/users/v2/me/webauthn/start-registration`,
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-          Authorization: `Basic ${auth}`,
+          Authorization: `Bearer ${token}`,
         },
         data: appId,
       })
         .then((usernamelessRegistrationResponse) => {
+          console.log('usernamelessRegistrationResponse-------------');
+          console.log(usernamelessRegistrationResponse);
+
+          console.log('user-------------');
+          console.log(usernamelessRegistrationResponse.data.publicKeyCredentialCreationOptions.user);
           requestId = usernamelessRegistrationResponse.data.requestId;
 
           // Response to the conformance tools
@@ -126,6 +155,7 @@ export default ({ app }: { app: express.Application }) => {
           res.send(returnData);
         })
         .catch((err) => {
+          console.log(err);
           res.send({
             status: "failed",
             errorMessage: err.message,
@@ -138,7 +168,7 @@ export default ({ app }: { app: express.Application }) => {
         url: `https://${config.host}:9443/api/users/v2/me/webauthn/start-usernameless-registration`,
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-          Authorization: `Basic ${auth}`,
+          Authorization: `Bearer ${token}`,
         },
         data: appId,
       })
@@ -210,6 +240,8 @@ export default ({ app }: { app: express.Application }) => {
       requestId: requestId,
     };
 
+    console.log('req.body.response---------------------', req.body.response);
+
     // 1. Read AAGUID from the request
     try {
       const { id, rawId, response, type } = req.body;
@@ -223,6 +255,9 @@ export default ({ app }: { app: express.Application }) => {
         aaguid,
         credentialPublicKey,
       } = parseAuthenticatorData.default(authData);
+
+      console.log('fmt-------------', fmt);
+      console.log('aaguid-------------', Number.parseInt(aaguid.toString("hex"), 16));
 
       let verified = false;
 
@@ -335,7 +370,7 @@ export default ({ app }: { app: express.Application }) => {
       url: `https://${config.host}:9443/api/users/v2/me/webauthn/finish-registration`,
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Basic ${auth}`,
+        Authorization: `Bearer ${token}`,
       },
       data: data,
     })
@@ -393,6 +428,7 @@ const createUser = async (userData) => {
       // givenName: userData.givenName,
       formatted: userData.givenName + " " + userData.familyName,
     },
+    displayName: userData.givenName + " " + userData.familyName,
     userName: userData.userName,
     password: userData.password,
     emails: [
@@ -405,6 +441,7 @@ const createUser = async (userData) => {
   });
 
   try {
+    // console.log(data);
     return await axios({
       method: "post",
       url: `https://${config.host}:9443/scim2/Users`,
@@ -413,7 +450,8 @@ const createUser = async (userData) => {
         Authorization: "Basic YWRtaW46YWRtaW4=",
       },
       data: data,
-    });
+    }
+    ).then (response => {});
   } catch (error) {
     console.error(error);
   }
