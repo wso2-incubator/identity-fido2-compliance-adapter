@@ -4,3 +4,5 @@
 /src/app/extensions.py
 /security/server.cert
 /security/server.key
+
+.DS_Store
