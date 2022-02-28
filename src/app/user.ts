@@ -11,6 +11,21 @@ const searchUser = async (req) => {
     // Set filter for user search
     var filter = `userName sw ${req.body.username}`;
 
+    var url = `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `scim2/Users/.search`;
+    var authToken = "";
+
+    if (config.isCloudSetup) {
+        authToken = await obtainBearerToken();
+
+        if (authToken === "") {
+            console.log("Error retrieving bearer token!");
+        } else {
+            authToken = "Bearer " + authToken;
+        }
+    } else {
+        authToken = `Basic ${config.basicAuthCredentials}`;
+    }
+
     var searchUserdata = {
         schemas: ["urn:ietf:params:scim:api:messages:2.0:SearchRequest"],
         attributes: ["name.familyName", "userName"],
@@ -22,11 +37,10 @@ const searchUser = async (req) => {
 
     return await axios({
         method: "post",
-
-        url: `https://${config.host}:9443/scim2/Users/.search`,
+        url: url,
         headers: {
             "Content-Type": "application/scim+json",
-            Authorization: "Basic YWRtaW46YWRtaW4=",
+            Authorization: authToken,
         },
         data: searchUserdata,
     });
@@ -39,38 +53,48 @@ const createUser = async (userData) => {
     var data = JSON.stringify({
         schemas: [],
         name: {
-            // familyName: userData.familyName,
-            // givenName: userData.givenName,
-            formatted: userData.givenName + " " + userData.familyName,
+            familyName: userData.familyName,
+            givenName: userData.givenName,
         },
         displayName: userData.givenName + " " + userData.familyName,
         userName: userData.userName,
         password: userData.password,
         emails: [{
                 primary: true,
-                value: userData.homeEmail,
+                value: config.isCloudSetup ? `CUSTOMER-DEFAULT/${userData.homeEmail}` : userData.homeEmail,
                 type: "home"
             },
             {
                 value: userData.workEmail,
                 type: "work"
             },
-        ],
-        "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
-            customClaim: userData.attestationClaim,
-        },
+        ]
     });
 
     var userCreated = false;
 
     try {
-        // console.log(data);
+        var url = `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `scim2/Users`;
+        var authToken = "";
+
+        if (config.isCloudSetup) {
+            authToken = await obtainBearerToken();
+
+            if (authToken === "") {
+                console.log("Error retrieving bearer token!");
+            } else {
+                authToken = "Bearer " + authToken;
+            }
+        } else {
+            authToken = `Basic ${config.basicAuthCredentials}`;
+        }
+
         await axios({
             method: "post",
-            url: `https://${config.host}:9443/scim2/Users`,
+            url: url,
             headers: {
                 "Content-Type": "application/json",
-                Authorization: "Basic YWRtaW46YWRtaW4=",
+                Authorization: authToken,
             },
             data: data,
         }).then(response => {
@@ -109,15 +133,30 @@ const createUser = async (userData) => {
     var userCount = 0;
     var deletedCount = 0;
 
+    var url = `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `scim2/Users`;
+    var authToken = "";
+
+    if (config.isCloudSetup) {
+        authToken = await obtainBearerToken();
+
+        if (authToken === "") {
+            console.log("Error retrieving bearer token!");
+        } else {
+            authToken = "Bearer " + authToken;
+        }
+    } else {
+        authToken = `Basic ${config.basicAuthCredentials}`;
+    }
+
     for await (const userId of readLine) {
         userCount += 1;
         try {
             await axios({
                 method: "delete",
-                url: `https://${config.host}:9443/scim2/Users/${userId}`,
+                url: url + `/${userId}`,
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: "Basic YWRtaW46YWRtaW4=",
+                    Authorization: authToken,
                 }
             }).then(response => {
                 if (response.status == 204) {
@@ -137,82 +176,45 @@ const createUser = async (userData) => {
     return `${deletedCount} users deleted from ${userCount} user records.`;
 };
 
-/**
- * Create user claim
- */
-const createClaim = async (claimData) => {
-    var data = JSON.stringify({
-        claimURI: "http://wso2.org/claims/a",
-        description: "Some description about the claim.",
-        displayOrder: 10,
-        displayName: "Test",
-        readOnly: false,
-        required: false,
-        supportedByDefault: true,
-        attributeMapping: [{
-            mappedAttribute: "username",
-            userstore: "PRIMARY"
-        }],
-        properties: [{
-            key: "string",
-            value: "string"
-        }],
+const obtainBearerToken = async () => {
+    var token = "";
+    await axios({
+        method: "post",
+        url: `https://${config.host}/oauth2/token?grant_type=${config.bearerTokenGrantType}&client_id=${config.bearerTokenClientId}&username=${config.bearerTokenUsername}&password=${config.bearerTokenPassword}&scope=${config.bearerTokenScope}`,
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+    }).then((response) => {
+        token = response.data["access_token"];
+    }).catch((error) => {
+        console.log("Error while retrieving bearer token", error);
     });
 
-    try {
-        return await axios({
-            method: "post",
-            url: `https://${config.host}:9443/api/server/v1/claim-dialects/local/claims`,
-            headers: {
-                accept: "application/json",
-                "Content-Type": "application/json",
-                Authorization: "Basic YWRtaW46YWRtaW4=",
-            },
-            data: data,
-        });
-    } catch (error) {
-        console.error(error);
-    }
-};
+    return token;
+}
 
-/**
- * Set user claim
- */
-const setClaim = async (claimData) => {
-    var data = JSON.stringify({
-        claimURI: "http://wso2.org/claims/username",
-        description: "Some description about the claim.",
-        displayOrder: 10,
-        displayName: "Username",
-        readOnly: true,
-        regEx: "^([a-zA-Z)$",
-        required: true,
-        supportedByDefault: true,
-        attributeMapping: [{
-            mappedAttribute: "username",
-            userstore: "SECONDARY"
-        }],
-        properties: [{
-            key: "string",
-            value: "string"
-        }],
-    });
+const formatUsername = (providedName) => {
+    const validRegex = /^[^!@#$%\^&\*\(\)_\+\-=\[\]{};':"\\|,.<>\/?]+(.)*[^!@#$%\^&\*\(\)_\+\-=\[\]{};':"\\|,.<>\/?]+@(.)+\.(.)+$/;
+    const invalidRegex1 = /[!@#$%\^&\*\(\)_\+\-=\[\]{};':"\\|,.<>\/?]{2,}/;
 
-    try {
-        return await axios({
-            method: "put",
-            url: "https://localhost:9443/api/server/v1/claim-dialects/local/claims/test",
-            headers: {
-                accept: "application/json",
-                "Content-Type": "application/json",
-            },
-            data: data,
-        });
-    } catch (error) {
-        console.error(error);
+    if (config.isCloudSetup) {
+        providedName = `CUSTOMER-DEFAULT/fido${providedName}@fidotest.com`;
     }
-};
+
+    if (!validRegex.test(providedName)) {
+        providedName = providedName.split("@")[0] + "post@fidotest.com";
+
+        if (invalidRegex1.test(providedName)) {
+            return [true, providedName.replace(invalidRegex1, "")];
+        }
+        return [true, providedName];
+    } else if (invalidRegex1.test(providedName)) {
+        return [true, providedName.replace(invalidRegex1, "")];
+    }
+
+    return [false, providedName];
+}
 
 module.exports = {
-    searchUser, createUser, deleteUsers, createClaim, setClaim
+    searchUser, createUser, deleteUsers, formatUsername
 }

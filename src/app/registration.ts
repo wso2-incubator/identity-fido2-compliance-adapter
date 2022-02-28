@@ -1,27 +1,18 @@
 import express, { response } from "express";
 import axios from "axios";
 import encode from "nodejs-base64-encode";
+
 const base64url = require("base64url");
 const userOps = require("./user");
-
-// Metadata - simplewebauthn
-import { MetadataService } from "@simplewebauthn/server";
-import { MetadataStatement } from "@simplewebauthn/server/dist/metadata/metadataService";
-import verifyAttestationWithMetadata = require("@simplewebauthn/server/dist/metadata/verifyAttestationWithMetadata");
-import convertX509CertToPEM = require("@simplewebauthn/server/dist/helpers/convertX509CertToPEM");
-import verifySignature = require("@simplewebauthn/server/dist/helpers/verifySignature");
-import toHash = require("@simplewebauthn/server/dist/helpers/toHash");
-import decodeCredentialPublicKey = require("@simplewebauthn/server/dist/helpers/decodeCredentialPublicKey");
-import convertCOSEtoPKCS = require("@simplewebauthn/server/dist/helpers/convertCOSEtoPKCS");
-
 const getCertificateInfo = require("@simplewebauthn/server/dist/helpers/getCertificateInfo");
 
 let config = require("./../../config.json");
 
 var challenge: any;
-var auth: any;
 var authClient: any;
 var token: any;
+var invalidUsername: any = false;
+var providedUsername = "";
 
 export default ({ app }: { app: express.Application }) => {
   /**
@@ -41,23 +32,26 @@ export default ({ app }: { app: express.Application }) => {
   var requestId;
 
   app.post("/attestation/options", async (req, res) => {
-    console.log(`\n\nRequest @ /attestation/options`);
+    console.log(`\nRequest @ /attestation/options`);
     console.log("user >> ", req.body.username, req.body.displayName);
 
     var extensions = { "example.extension": true };
     var attestationLogic = req.body.attestation == "direct" ? "direct" : "none";
+    var username = userOps.formatUsername(req.body.username);
+    invalidUsername = username[0];
+    username = username[1];
+    providedUsername = req.body.username;
 
     // Set user data required to create a user in wso2is.
     var userData = {
       familyName: req.body.displayName.split(" ")[1],
       givenName: req.body.displayName.split(" ")[0],
-      userName: req.body.username,
-      password: "password",
+      userName: username,
+      password: config.userPassword,
       homeEmail:
         req.body.displayName.split(" ")[0].toLowerCase() + `_home@gmail.com`,
       workEmail:
-        req.body.displayName.split(" ")[0].toLowerCase() + `_work@gmail.com`,
-      attestationClaim: req.body.attestation.toUpperCase(),
+        req.body.displayName.split(" ")[0].toLowerCase() + `_work@gmail.com`
     };
 
     // Create user.
@@ -69,12 +63,13 @@ export default ({ app }: { app: express.Application }) => {
       });
     }
 
-    authClient = encode.encode(`${config.sampleAppId}:${config.clientSecret}`, "base64");
+    authClient = encode.encode(`${config.clientID}:${config.clientSecret}`, "base64");
+    var url = `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `oauth2/token?grant_type=password&username=${userData.userName}&password=${userData.password}&scope=internal_login`;
 
     // Obtain an access token using the password grant call and 'internal_login' scope.
     await axios({
       method: "post",
-      url: `https://${config.host}:9443/oauth2/token?grant_type=password&username=${userData.userName}&password=${userData.password}&scope=internal_login`,
+      url: url,
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         Authorization: `Basic ${authClient}`,
@@ -85,8 +80,6 @@ export default ({ app }: { app: express.Application }) => {
       console.log("Error while retrieving access token", error);
     })
 
-    auth = encode.encode(`${userData.userName}:${userData.password}`, "base64");
-
     if (
       req.body.authenticatorSelection &&
       req.body.authenticatorSelection.requireResidentKey == false
@@ -94,7 +87,7 @@ export default ({ app }: { app: express.Application }) => {
       // start-registration
       await axios({
         method: "post",
-        url: `https://${config.host}:9443/api/users/v2/me/webauthn/start-registration`,
+        url: `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `api/users/v2/me/webauthn/start-registration`,
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
           Authorization: `Bearer ${token}`,
@@ -104,6 +97,15 @@ export default ({ app }: { app: express.Application }) => {
         .then((usernamelessRegistrationResponse) => {
           requestId = usernamelessRegistrationResponse.data.requestId;
 
+          var user = usernamelessRegistrationResponse.data.publicKeyCredentialCreationOptions.user;
+          if (config.isCloudSetup) {
+            if (invalidUsername) {
+              user.name = providedUsername;
+            } else {
+              user.name = user.name.split("@")[0].substring(4);
+            }
+          }
+
           // Construct response to the conformance tools.
           var returnData = {
             status: "ok",
@@ -111,9 +113,7 @@ export default ({ app }: { app: express.Application }) => {
             rp:
               usernamelessRegistrationResponse.data
                 .publicKeyCredentialCreationOptions.rp,
-            user:
-              usernamelessRegistrationResponse.data
-                .publicKeyCredentialCreationOptions.user,
+            user: user,
             challenge:
               usernamelessRegistrationResponse.data
                 .publicKeyCredentialCreationOptions.challenge,
@@ -151,7 +151,7 @@ export default ({ app }: { app: express.Application }) => {
       // start-usernameless-registration
       await axios({
         method: "post",
-        url: `https://${config.host}:9443/api/users/v2/me/webauthn/start-usernameless-registration`,
+        url: `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `api/users/v2/me/webauthn/start-usernameless-registration`,
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
           Authorization: `Bearer ${token}`,
@@ -161,6 +161,15 @@ export default ({ app }: { app: express.Application }) => {
         .then((usernamelessRegistrationResponse) => {
           requestId = usernamelessRegistrationResponse.data.requestId;
 
+          var user = usernamelessRegistrationResponse.data.publicKeyCredentialCreationOptions.user;
+          if (config.isCloudSetup) {
+            if (invalidUsername) {
+              user.name = providedUsername;
+            } else {
+              user.name = user.name.split("@")[0].substring(4);
+            }
+          }
+
           // Response to the conformance tools
           var returnData = {
             status: "ok",
@@ -168,9 +177,7 @@ export default ({ app }: { app: express.Application }) => {
             rp:
               usernamelessRegistrationResponse.data
                 .publicKeyCredentialCreationOptions.rp,
-            user:
-              usernamelessRegistrationResponse.data
-                .publicKeyCredentialCreationOptions.user,
+            user: user,
             challenge:
               usernamelessRegistrationResponse.data
                 .publicKeyCredentialCreationOptions.challenge,
@@ -215,7 +222,7 @@ export default ({ app }: { app: express.Application }) => {
    * Authenticator Attestation Response.
    */
   app.post("/attestation/result", async (req, res) => {
-    console.log(`\n\nRequest @ /attestation/results`);
+    console.log(`\nRequest @ /attestation/results`);
 
     // Arrange data to be sent to the server.
     var data = {
@@ -231,7 +238,7 @@ export default ({ app }: { app: express.Application }) => {
     // Finish registration request.
     var x = await axios({
       method: "post",
-      url: `https://${config.host}:9443/api/users/v2/me/webauthn/finish-registration`,
+      url: `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `api/users/v2/me/webauthn/finish-registration`,
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
@@ -256,7 +263,7 @@ export default ({ app }: { app: express.Application }) => {
    * Delete users.
    */
   app.delete("/adapter/users/delete", async (req, res) => {
-    console.log(`\n\nRequest @ /adapter/users/delete`);
+    console.log(`\nRequest @ /adapter/users/delete`);
 
     userOps.deleteUsers().then((response) => {
       res.send({

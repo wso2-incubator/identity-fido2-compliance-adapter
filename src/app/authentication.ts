@@ -8,7 +8,6 @@ import parseAuthenticatorData from "@simplewebauthn/server/dist/helpers/parseAut
 let config = require("./../../config.json");
 let requestId: any;
 let sessionDataKey: any;
-let host = "localhost";
 let auth: any;
 let sessionNonceCookie: string;
 var userVerification: any;
@@ -28,19 +27,19 @@ export default ({ app }: { app: express.Application }) => {
   });
 
   app.post("/assertion/options", async (req, res) => {
-    console.log("\n\n\n");
-    console.log(`Request @ /assertion/options`);
+    console.log(`\nRequest @ /assertion/options`);
 
     optionsRequestCounter += 1;
+    sessionNonceCookie = "";
 
     // Client Id of the sample app
-    var client_id = config.sampleAppId;
+    var client_id = config.clientID;
     userVerification = req.body?.userVerification;
     var extensions = req.body?.extensions;
 
-    auth = encode.encode(`${req.body.username}:password`, "base64");
+    auth = encode.encode(`${req.body.username}:${config.userPassword}`, "base64");
 
-    var url = `https://${host}:9443/oauth2/authorize?scope=openid&response_type=code&redirect_uri=https://oidcdebugger.com/debug&client_id=${client_id}`;
+    var url = `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `oauth2/authorize?scope=openid&response_type=code&redirect_uri=${config.redirectUri}&client_id=${client_id}`;
 
     // start-authentication
     await axios({
@@ -54,22 +53,16 @@ export default ({ app }: { app: express.Application }) => {
         ContentType: "application/json",
         Authorization: `Basic ${auth}`,
       },
+      maxRedirects: 0
     })
       .then((response: any) => {
-        console.log("\n<<<<<<<<< start-authentication >>>>>>>>>>>", response.status, response.request._header);
-
-        // console.log("\n\n====================== debug response ================================\n", response.headers['set-cookie']);
-
         var headers: any = response.request._header;
-
-        var requestUrlfido2auth = headers.split("?")[0].split(" ")[1];
         sessionDataKey = headers.split("?")[1].split("&")[2].split("=")[1];
         var data = JSON.parse(
           unescape(
             headers.split("?")[1].split("&")[3].split(" ")[0].split("=")[1]
           )
         );
-
         requestId = data.requestId;
 
         var responseToAdapter = {
@@ -84,7 +77,9 @@ export default ({ app }: { app: express.Application }) => {
         };
 
         /**
-         * 
+         * This particular test expects the allowCredentials list and that is not supported by the browser.
+         * Allow credentials are not required in the usernameless authentication.
+         * According to spec, credentials are used when the user has to be identified.
          */
         if (optionsRequestCounter == 1 && resultRequestCounter == 0) {
           responseToAdapter.allowCredentials = [
@@ -99,12 +94,49 @@ export default ({ app }: { app: express.Application }) => {
         res.send(responseToAdapter);
       })
       .catch((error) => {
-        // console.log("\n<<<<<<<<< start-authentication error >>>>>>>>>>>", error);
-        
-        res.send({
-          status: "failed",
-          errorMessage: "",
-        });
+        if (error.response?.status == 302) {
+          var responseLocation: string = error.response.headers?.location;
+          sessionDataKey = responseLocation.split("?")[1].split("&")[2].split("=")[1];
+          var data = JSON.parse(
+            unescape(
+              responseLocation.split("?")[1].split("&")[3].split(" ")[0].split("=")[1]
+            )
+          );
+          requestId = data.requestId;
+          sessionNonceCookie = error.response.headers["set-cookie"];
+
+          var responseToAdapter = {
+            status: "ok",
+            errorMessage: "",
+            challenge: data.publicKeyCredentialRequestOptions.challenge,
+            timeout: 20000,
+            rpId: data.publicKeyCredentialRequestOptions.rpId,
+            allowCredentials: [],
+            userVerification: userVerification ?? data.publicKeyCredentialRequestOptions.userVerification,
+            extensions: extensions
+          };
+
+          /**
+           * This particular test expects the allowCredentials list and that is not supported by the browser.
+           * Allow credentials are not required in the usernameless authentication.
+           * According to spec, credentials are used when the user has to be identified.
+           */
+          if (optionsRequestCounter == 1 && resultRequestCounter == 0) {
+            responseToAdapter.allowCredentials = [
+              {
+                type: "public-key",
+                id: "rnInB99skrSHLwQJpAio3W2S5RMHGYGudqdobiUImDI",
+              }
+            ]
+          }
+
+          res.send(responseToAdapter);
+        } else {
+          res.send({
+            status: "failed",
+            errorMessage: "",
+          });
+        }
       });
   });
 
@@ -112,8 +144,7 @@ export default ({ app }: { app: express.Application }) => {
    * Authenticator Assertion Response
    */
   app.post("/assertion/result", async (req, res) => {
-    console.log("\n\n\n");
-    console.log(`Request @ /assertion/result`);
+    console.log(`\nRequest @ /assertion/result`);
 
     resultRequestCounter += 1;
 
@@ -155,14 +186,12 @@ export default ({ app }: { app: express.Application }) => {
     delete req.body["getClientExtensionResults"];
 
     var tr = JSON.stringify({ requestId: requestId, credential: req.body });
-
     var tokenResponse: any = JSON.parse(JSON.stringify(tr));
-
-    var referer = `https://${host}:9443/authenticationendpoint/fido2-auth.jsp?authenticators=FIDOAuthenticator%3ALOCAL&type=fido&sessionDataKey=${sessionDataKey}&data=${tr}`;
+    var referer = `https://${config.authRequestRefererHost}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `authenticationendpoint/fido2-auth.jsp?authenticators=FIDOAuthenticator%3ALOCAL&type=fido&sessionDataKey=${sessionDataKey}&data=${tr}`;
 
     axios
       .post(
-        `https://${host}:9443/commonauth`,
+        `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + "commonauth",
         querystring.stringify({
           sessionDataKey: sessionDataKey,
           tokenResponse: tr,
@@ -175,12 +204,11 @@ export default ({ app }: { app: express.Application }) => {
             "Content-Type": "application/x-www-form-urlencoded",
             Authorization: `Basic ${auth}`,
             Referer: referer,
+            cookie: sessionNonceCookie
           },
         }
       )
       .then(async (response) => {
-        console.log("\n<<<<<<<<< finish-authentication >>>>>>>>>>>", response.status, response.request.path);
-
         // If the return path contains the code, that means a successful authentication.
         if (response.request.path.includes("code=")) {
           res.send({
@@ -195,8 +223,6 @@ export default ({ app }: { app: express.Application }) => {
         }
       })
       .catch((error) => {
-        // console.log("\n<<<<<<<<< finish-authentication error >>>>>>>>>>>", error);
-        
         res.send({
           status: "failed",
           errorMessage: "",
@@ -208,7 +234,7 @@ export default ({ app }: { app: express.Application }) => {
    * Reset counters.
    */
    app.get("/adapter/counter/reset", async (req, res) => {
-    console.log(`\n\nRequest @ /adapter/counter/reset`);
+    console.log(`\nRequest @ /adapter/counter/reset`);
 
     optionsRequestCounter = 0;
     resultRequestCounter = 0;

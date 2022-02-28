@@ -46,7 +46,7 @@ npm install
 
 ```sh
 Open  `config.json`
-Change sampleAppId to your sample app id
+Change clientID to your sample application client id
 Change the other configurations if needed
 ```
 
