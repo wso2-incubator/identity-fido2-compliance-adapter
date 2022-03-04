@@ -182,8 +182,16 @@ export default ({ app }: { app: express.Application }) => {
       }
     }
 
+    /**
+     * These parameters are not supported by the yubico data structure. Therefore need to remove before 
+     * sending to the backend implementation. Otherwise will throw data conversion exception.
+     */
     req.body["clientExtensionResults"] = {};
     delete req.body["getClientExtensionResults"];
+    
+    if (req.body["authenticatorAttachment"]) {
+      delete req.body["authenticatorAttachment"];
+    }
 
     var tr = JSON.stringify({ requestId: requestId, credential: req.body });
     var tokenResponse: any = JSON.parse(JSON.stringify(tr));

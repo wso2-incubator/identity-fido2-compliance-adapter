@@ -235,6 +235,24 @@ export default ({ app }: { app: express.Application }) => {
       requestId: requestId,
     };
 
+    /**
+     * These parameters are not supported by the yubico data structure. Therefore need to remove before 
+     * sending to the backend implementation. Otherwise will throw data conversion exception.
+     */
+    if (data.credential.response.getTransports) {
+      delete data.credential.response.getTransports;
+    }
+    if (data.credential.response.getAuthenticatorData) {
+      data.credential.response.authenticatorData = data.credential.response.getAuthenticatorData;
+      delete data.credential.response.getAuthenticatorData;
+    }
+    if (data.credential.response.getPublicKey) {
+      delete data.credential.response.getPublicKey;
+    }
+    if (data.credential.response.getPublicKeyAlgorithm) {
+      delete data.credential.response.getPublicKeyAlgorithm;
+    }
+
     // Finish registration request.
     var x = await axios({
       method: "post",

@@ -198,7 +198,11 @@ const formatUsername = (providedName) => {
     const invalidRegex1 = /[!@#$%\^&\*\(\)_\+\-=\[\]{};':"\\|,.<>\/?]{2,}/;
 
     if (config.isCloudSetup) {
-        providedName = `CUSTOMER-DEFAULT/fido${providedName}@fidotest.com`;
+        if (providedName.includes("@")) {
+            providedName = `CUSTOMER-DEFAULT/fido${providedName}`;
+        } else {
+            providedName = `CUSTOMER-DEFAULT/fido${providedName}@fidotest.com`;
+        }
     }
 
     if (!validRegex.test(providedName)) {

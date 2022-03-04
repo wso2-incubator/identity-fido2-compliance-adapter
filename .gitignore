@@ -4,5 +4,6 @@
 /src/app/extensions.py
 /security/server.cert
 /security/server.key
+/src/app/interop-testing/index.html
 
 .DS_Store
