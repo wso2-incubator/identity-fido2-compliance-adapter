@@ -1,19 +1,19 @@
 import express, { response } from "express";
 import axios from "axios";
-import querystring from "querystring";
 import encode from "nodejs-base64-encode";
-
 import parseAuthenticatorData from "@simplewebauthn/server/dist/helpers/parseAuthenticatorData";
 
-let config = require("./../../config.json");
+const qs = require('qs');
+
+const config = require("./../../config.json");
 let requestId: any;
 let sessionDataKey: any;
 let auth: any;
 let sessionNonceCookie: string;
-var userVerification: any;
+let userVerification: any;
 
-var optionsRequestCounter = 0;
-var resultRequestCounter = 0;
+let optionsRequestCounter = 0;
+let resultRequestCounter = 0;
 
 export default ({ app }: { app: express.Application }) => {
   /**
@@ -33,13 +33,13 @@ export default ({ app }: { app: express.Application }) => {
     sessionNonceCookie = "";
 
     // Client Id of the sample app
-    var client_id = config.clientID;
+    let client_id = config.clientID;
     userVerification = req.body?.userVerification;
-    var extensions = req.body?.extensions;
+    let extensions = req.body?.extensions;
 
     auth = encode.encode(`${req.body.username}:${config.userPassword}`, "base64");
 
-    var url = `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `oauth2/authorize?scope=openid&response_type=code&redirect_uri=${config.redirectUri}&client_id=${client_id}`;
+    let url = `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `oauth2/authorize?scope=openid&response_type=code&redirect_uri=${config.redirectUri}&client_id=${client_id}`;
 
     // start-authentication
     await axios({
@@ -56,16 +56,16 @@ export default ({ app }: { app: express.Application }) => {
       maxRedirects: 0
     })
       .then((response: any) => {
-        var headers: any = response.request._header;
+        let headers: any = response.request._header;
         sessionDataKey = headers.split("?")[1].split("&")[2].split("=")[1];
-        var data = JSON.parse(
+        let data = JSON.parse(
           unescape(
             headers.split("?")[1].split("&")[3].split(" ")[0].split("=")[1]
           )
         );
         requestId = data.requestId;
 
-        var responseToAdapter = {
+        let responseToAdapter = {
           status: "ok",
           errorMessage: "",
           challenge: data.publicKeyCredentialRequestOptions.challenge,
@@ -95,9 +95,9 @@ export default ({ app }: { app: express.Application }) => {
       })
       .catch((error) => {
         if (error.response?.status == 302) {
-          var responseLocation: string = error.response.headers?.location;
+          let responseLocation: string = error.response.headers?.location;
           sessionDataKey = responseLocation.split("?")[1].split("&")[2].split("=")[1];
-          var data = JSON.parse(
+          let data = JSON.parse(
             unescape(
               responseLocation.split("?")[1].split("&")[3].split(" ")[0].split("=")[1]
             )
@@ -105,7 +105,7 @@ export default ({ app }: { app: express.Application }) => {
           requestId = data.requestId;
           sessionNonceCookie = error.response.headers["set-cookie"];
 
-          var responseToAdapter = {
+          let responseToAdapter = {
             status: "ok",
             errorMessage: "",
             challenge: data.publicKeyCredentialRequestOptions.challenge,
@@ -150,9 +150,9 @@ export default ({ app }: { app: express.Application }) => {
 
     if (req.body.response?.authenticatorData) {
       try {
-        var authenticatorData = parseAuthenticatorData(Buffer.from(req.body.response?.authenticatorData, 'base64'));
-        var authenticatorFlagsUP = authenticatorData?.flags?.up;
-        var authenticatorFlagsUV = authenticatorData?.flags?.uv;
+        let authenticatorData = parseAuthenticatorData(Buffer.from(req.body.response?.authenticatorData, 'base64'));
+        let authenticatorFlagsUP = authenticatorData?.flags?.up;
+        let authenticatorFlagsUV = authenticatorData?.flags?.uv;
 
         /**
          * According to webauthn specification, the server should check for the existance of UP flag.
@@ -193,14 +193,14 @@ export default ({ app }: { app: express.Application }) => {
       delete req.body["authenticatorAttachment"];
     }
 
-    var tr = JSON.stringify({ requestId: requestId, credential: req.body });
-    var tokenResponse: any = JSON.parse(JSON.stringify(tr));
-    var referer = `https://${config.authRequestRefererHost}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `authenticationendpoint/fido2-auth.jsp?authenticators=FIDOAuthenticator%3ALOCAL&type=fido&sessionDataKey=${sessionDataKey}&data=${tr}`;
+    let tr = JSON.stringify({ requestId: requestId, credential: req.body });
+    let tokenResponse: any = JSON.parse(JSON.stringify(tr));
+    let referer = `https://${config.authRequestRefererHost}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `authenticationendpoint/fido2-auth.jsp?authenticators=FIDOAuthenticator%3ALOCAL&type=fido&sessionDataKey=${sessionDataKey}&data=${tr}`;
 
     axios
       .post(
         `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + "commonauth",
-        querystring.stringify({
+        qs.stringify({
           sessionDataKey: sessionDataKey,
           tokenResponse: tr,
         }),

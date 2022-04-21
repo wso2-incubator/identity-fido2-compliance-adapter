@@ -1,18 +1,20 @@
 import axios from "axios";
+
 const fs = require("fs");
 const readline = require("readline");
+const qs = require('qs');
 
-let config = require("./../../config.json");
+const config = require("./../../config.json");
 
 /**
  * Find availability of a user with SCIM2 API
  */
 const searchUser = async (req) => {
     // Set filter for user search
-    var filter = `userName sw ${req.body.username}`;
+    let filter = `userName sw ${req.body.username}`;
 
-    var url = `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `scim2/Users/.search`;
-    var authToken = "";
+    let url = `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `scim2/Users/.search`;
+    let authToken = "";
 
     if (config.isCloudSetup) {
         authToken = await obtainBearerToken();
@@ -26,7 +28,7 @@ const searchUser = async (req) => {
         authToken = `Basic ${config.basicAuthCredentials}`;
     }
 
-    var searchUserdata = {
+    let searchUserdata = {
         schemas: ["urn:ietf:params:scim:api:messages:2.0:SearchRequest"],
         attributes: ["name.familyName", "userName"],
         filter: filter,
@@ -50,7 +52,7 @@ const searchUser = async (req) => {
  * Create user with SCIM2 API
  */
 const createUser = async (userData) => {
-    var data = JSON.stringify({
+    let data = JSON.stringify({
         schemas: [],
         name: {
             familyName: userData.familyName,
@@ -61,7 +63,7 @@ const createUser = async (userData) => {
         password: userData.password,
         emails: [{
                 primary: true,
-                value: config.isCloudSetup ? `CUSTOMER-DEFAULT/${userData.homeEmail}` : userData.homeEmail,
+                value: config.isCloudSetup ? `${config.userStoreDomain}/${userData.homeEmail}` : userData.homeEmail,
                 type: "home"
             },
             {
@@ -71,11 +73,11 @@ const createUser = async (userData) => {
         ]
     });
 
-    var userCreated = false;
+    let userCreated = false;
 
     try {
-        var url = `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `scim2/Users`;
-        var authToken = "";
+        let url = `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `scim2/Users`;
+        let authToken = "";
 
         if (config.isCloudSetup) {
             authToken = await obtainBearerToken();
@@ -130,11 +132,11 @@ const createUser = async (userData) => {
         crlfDelay: Infinity
     });
 
-    var userCount = 0;
-    var deletedCount = 0;
+    let userCount = 0;
+    let deletedCount = 0;
 
-    var url = `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `scim2/Users`;
-    var authToken = "";
+    let url = `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `scim2/Users`;
+    let authToken = "";
 
     if (config.isCloudSetup) {
         authToken = await obtainBearerToken();
@@ -177,13 +179,20 @@ const createUser = async (userData) => {
 };
 
 const obtainBearerToken = async () => {
-    var token = "";
+    let token = "";
     await axios({
         method: "post",
-        url: `https://${config.host}/oauth2/token?grant_type=${config.bearerTokenGrantType}&client_id=${config.bearerTokenClientId}&username=${config.bearerTokenUsername}&password=${config.bearerTokenPassword}&scope=${config.bearerTokenScope}`,
+        url: `https://${config.host}/oauth2/token`,
         headers: {
             "Content-Type": "application/x-www-form-urlencoded"
-        }
+        },
+        data: qs.stringify({
+            grant_type: config.bearerTokenGrantType,
+            client_id: config.bearerTokenClientId,
+            username: config.bearerTokenUsername,
+            password: config.bearerTokenPassword,
+            scope: config.bearerTokenScope
+        })
     }).then((response) => {
         token = response.data["access_token"];
     }).catch((error) => {
@@ -199,9 +208,9 @@ const formatUsername = (providedName) => {
 
     if (config.isCloudSetup) {
         if (providedName.includes("@")) {
-            providedName = `CUSTOMER-DEFAULT/fido${providedName}`;
+            providedName = `${config.userStoreDomain}/fido${providedName}`;
         } else {
-            providedName = `CUSTOMER-DEFAULT/fido${providedName}@fidotest.com`;
+            providedName = `${config.userStoreDomain}/fido${providedName}@fidotest.com`;
         }
     }
 

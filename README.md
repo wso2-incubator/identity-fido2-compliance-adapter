@@ -64,6 +64,7 @@ npm install
 | `bearerTokenUsername` | Username to obtain bearer token (Only requires in cloud setup) |  |
 | `bearerTokenPassword` | Password of the above provided user to obtain bearer token (Only requires in cloud setup) |  |
 | `bearerTokenScope` | Scope for the bearer token (Only requires in cloud setup) |  |
+| `userStoreDomain` | User store domain name (Only requires in cloud setup) |  |
 
 4. Follow below commands to add certificates to the adapter.
 
@@ -87,7 +88,7 @@ npm install
 npm start
 ```
 
-## Run FIDO Comformance Tests
+## Run FIDO Conformance Tests
 
 1. Download server metadata by clicking **DOWNLOAD SERVER METADATA** button. You are required to upload the extracted metadata files to the identity server inorder to pass metadata tests.
 2. Select the required test cases under **Server Tests**.
