@@ -15,6 +15,13 @@ let userVerification: any;
 let optionsRequestCounter = 0;
 let resultRequestCounter = 0;
 
+const allowCredentials = [
+    {
+        id: "rnInB99skrSHLwQJpAio3W2S5RMHGYGudqdobiUImDI",
+        type: "public-key"
+    }
+];
+
 export default ({ app }: { app: express.Application }) => {
     /**
      * Health Check endpoints registration.
@@ -40,20 +47,21 @@ export default ({ app }: { app: express.Application }) => {
 
         auth = encode.encode(`${req.body.username}:${config.userPassword}`, "base64");
 
-        const url = `https://${config.host}`
-            + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/")
-            + `oauth2/authorize?scope=openid&response_type=code&redirect_uri=${config.redirectUri}`
-            + `&client_id=${client_id}`;
+        const url = "https://" + config.host
+            + (config.tenantName && config.tenantName !== "" ? "/t/" + config.tenantName + "/" : "/")
+            + "oauth2/authorize?scope=openid&response_type=code&redirect_uri=" + config.redirectUri
+            + "&client_id=" + client_id;
+        const headers = {
+            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*",  
+            Authorization: `Basic ${auth}`,
+            Connection: "keep-alive",
+            ContentType: "application/json",
+            Host: "localhost:9443"
+        };
 
         // start-authentication.
         await axios({
-            headers: {
-                Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*",  
-                Authorization: `Basic ${auth}`,
-                Connection: "keep-alive",
-                ContentType: "application/json",
-                Host: "localhost:9443"
-            },
+            headers: headers,
             maxRedirects: 0,
             method: "get",
             url: url
@@ -86,12 +94,7 @@ export default ({ app }: { app: express.Application }) => {
              * According to spec, credentials are used when the user has to be identified.
              */
             if (optionsRequestCounter == 1 && resultRequestCounter == 0) {
-                responseToTool.allowCredentials = [
-                    {
-                        id: "rnInB99skrSHLwQJpAio3W2S5RMHGYGudqdobiUImDI",
-                        type: "public-key"
-                    }
-                ];
+                responseToTool.allowCredentials = allowCredentials;
             }
 
             res.header(response.headers);
@@ -127,12 +130,7 @@ export default ({ app }: { app: express.Application }) => {
                  * According to spec, credentials are used when the user has to be identified.
                  */
                 if (optionsRequestCounter == 1 && resultRequestCounter == 0) {
-                    responseToTool.allowCredentials = [
-                        {
-                            id: "rnInB99skrSHLwQJpAio3W2S5RMHGYGudqdobiUImDI",
-                            type: "public-key"
-                        }
-                    ];
+                    responseToTool.allowCredentials = allowCredentials;
                 }
 
                 res.send(responseToTool);
@@ -204,50 +202,50 @@ export default ({ app }: { app: express.Application }) => {
         }
 
         const tr = JSON.stringify({ credential: req.body, requestId: requestId });
-        const referer = `https://${config.authRequestRefererHost}`
-            + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") 
+        const referer = "https://" + config.authRequestRefererHost
+            + (config.tenantName && config.tenantName !== "" ? "/t/" + config.tenantName + "/" : "/")
             + "authenticationendpoint/fido2-auth.jsp?authenticators=FIDOAuthenticator%3ALOCAL"
-            + `&type=fido&sessionDataKey=${sessionDataKey}&data=${tr}`;
+            + "&type=fido&sessionDataKey=" + sessionDataKey + "&data=" + tr;
 
-        axios
-            .post(
-                `https://${config.host}` + (config.tenantName && config.tenantName !== ""
-                    ? `/t/${config.tenantName}/` : "/") + "commonauth",
-                qs.stringify({
-                    sessionDataKey: sessionDataKey,
-                    tokenResponse: tr
-                }),
-                {
-                    headers: {
-                        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*",
-                        Authorization: `Basic ${auth}`,
-                        Connection: "keep-alive",
-                        "Content-Type": "application/x-www-form-urlencoded",
-                        Referer: referer,
-                        cookie: sessionNonceCookie
-                    }
-                }
-            )
-            .then(async (response) => {
-                // If the return path contains the code, that means a successful authentication.
-                if (response.request.path.includes("code=")) {
-                    res.send({
-                        errorMessage: "",
-                        status: "ok"
-                    });
-                } else {
-                    res.send({
-                        errorMessage: "",
-                        status: "failed"
-                    });
-                }
-            })
-            .catch(() => {
+        const url = "https://" + config.host + (config.tenantName && config.tenantName !== ""
+            ? "/t/" + config.tenantName + "/" : "/") + "commonauth";
+        const headers = {
+            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*",
+            Authorization: `Basic ${auth}`,
+            Connection: "keep-alive",
+            "Content-Type": "application/x-www-form-urlencoded",
+            Referer: referer,
+            cookie: sessionNonceCookie
+        };
+        const data = qs.stringify({
+            sessionDataKey: sessionDataKey,
+            tokenResponse: tr
+        });
+
+        await axios({
+            data: data,
+            headers: headers,
+            method: "post",
+            url: url
+        }).then(async (response) => {
+            // If the return path contains the code, that means a successful authentication.
+            if (response.request.path.includes("code=")) {
+                res.send({
+                    errorMessage: "",
+                    status: "ok"
+                });
+            } else {
                 res.send({
                     errorMessage: "",
                     status: "failed"
                 });
+            }
+        }).catch(() => {
+            res.send({
+                errorMessage: "",
+                status: "failed"
             });
+        });
     });
 
     /**

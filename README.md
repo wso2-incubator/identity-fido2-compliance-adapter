@@ -13,7 +13,7 @@
 
 ## Setup Guide
 
-### Setup FIDO Conformance Testing Tool
+### Set up FIDO Conformance Testing Tool
 
 1. [Request FIDO conformance testing tool](https://fidoalliance.org/test-tool-access-request/) from FIDO Alliance.
 
@@ -25,7 +25,7 @@
 
 > Note: Tool (v1.6.42 experimental) will work only on macOS and Windows operating systems.
 
-### Setup Identity Server
+### Set up Identity Server
 
 1. Download and start WSO2 identity server and login to the console. Alternatively login to Asgardeo for cloud setup.
 

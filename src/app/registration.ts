@@ -62,21 +62,23 @@ export default ({ app }: { app: express.Application }) => {
         }
 
         authClient = encode.encode(`${config.clientID}:${config.clientSecret}`, "base64");
-        const url = `https://${config.host}` + (config.tenantName && config.tenantName !== ""
-            ? `/t/${config.tenantName}/` : "/") + "oauth2/token";
+        const url = "https://" + config.host + (config.tenantName && config.tenantName !== ""
+            ? "/t/" + config.tenantName + "/" : "/") + "oauth2/token";
+        const headers = {
+            Authorization: `Basic ${authClient}`,
+            "Content-Type": "application/x-www-form-urlencoded"
+        };
+        const data = qs.stringify({
+            grant_type: "password",
+            password: userData.password,
+            scope: "internal_login",
+            username: userData.userName
+        });
 
         // Obtain an access token using the password grant call and 'internal_login' scope.
         await axios({
-            data: qs.stringify({
-                grant_type: "password",
-                password: userData.password,
-                scope: "internal_login",
-                username: userData.userName
-            }),
-            headers: {
-                Authorization: `Basic ${authClient}`,
-                "Content-Type": "application/x-www-form-urlencoded"
-            },
+            data: data,
+            headers: headers,
             method: "post",
             url: url
         }).then((response) => {
@@ -85,20 +87,20 @@ export default ({ app }: { app: express.Application }) => {
             console.log("Error while retrieving access token", error);
         });
 
-        if (
-            req.body.authenticatorSelection &&
-      req.body.authenticatorSelection.requireResidentKey == false
-        ) {
+        if (req.body.authenticatorSelection && req.body.authenticatorSelection.requireResidentKey == false) {
             // start-registration.
+            const url = "https://" + config.host + (config.tenantName && config.tenantName !== ""
+                ? "/t/" + config.tenantName + "/" : "/") + "api/users/v2/me/webauthn/start-registration";
+            const headers = {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/x-www-form-urlencoded"
+            };
+
             await axios({
                 data: appId,
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/x-www-form-urlencoded"
-                },
+                headers: headers,
                 method: "post",
-                url: `https://${config.host}` + (config.tenantName && config.tenantName !== ""
-                    ? `/t/${config.tenantName}/` : "/") + "api/users/v2/me/webauthn/start-registration"
+                url: url
             }).then((usernamelessRegistrationResponse) => {
                 requestId = usernamelessRegistrationResponse.data.requestId;
 
@@ -143,15 +145,18 @@ export default ({ app }: { app: express.Application }) => {
             });
         } else {
             // start-usernameless-registration.
+            const url = "https://" + config.host + (config.tenantName && config.tenantName !== "" 
+                ? "/t/" + config.tenantName + "/" : "/") + "api/users/v2/me/webauthn/start-usernameless-registration";
+            const headers = {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/x-www-form-urlencoded"
+            };
+
             await axios({
                 data: appId,
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/x-www-form-urlencoded"
-                },
+                headers: headers,
                 method: "post",
-                url: `https://${config.host}` + (config.tenantName && config.tenantName !== "" 
-                    ? `/t/${config.tenantName}/` : "/") + "api/users/v2/me/webauthn/start-usernameless-registration"
+                url: url
             }).then((usernamelessRegistrationResponse) => {
                 requestId = usernamelessRegistrationResponse.data.requestId;
 
@@ -231,15 +236,18 @@ export default ({ app }: { app: express.Application }) => {
         }
 
         // Finish registration request.
+        const url = "https://" + config.host + (config.tenantName && config.tenantName !== ""
+            ? "/t/" + config.tenantName + "/" : "/") + "api/users/v2/me/webauthn/finish-registration";
+        const headers = {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+        };
+
         await axios({
             data: data,
-            headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json"
-            },
+            headers: headers,
             method: "post",
-            url: `https://${config.host}` + (config.tenantName && config.tenantName !== ""
-                ? `/t/${config.tenantName}/` : "/") + "api/users/v2/me/webauthn/finish-registration"
+            url: url
         }).then(() => {
             res.send({
                 errorMessage: "",

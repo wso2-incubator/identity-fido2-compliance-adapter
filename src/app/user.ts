@@ -12,8 +12,8 @@ const config = require("./../../config.json");
 const searchUser = async (req) => {
     // Set filter for user search.
     const filter = `userName sw ${req.body.username}`;
-    const url = `https://${config.host}` + (config.tenantName && config.tenantName !== ""
-        ? `/t/${config.tenantName}/` : "/") + "scim2/Users/.search";
+    const url = "https://" + config.host + (config.tenantName && config.tenantName !== ""
+        ? "/t/" + config.tenantName + "/" : "/") + "scim2/Users/.search";
     let authToken = "";
 
     if (config.isCloudSetup) {
@@ -36,13 +36,14 @@ const searchUser = async (req) => {
         schemas: [ "urn:ietf:params:scim:api:messages:2.0:SearchRequest" ],
         startIndex: 1
     };
+    const headers = {
+        Authorization: authToken,
+        "Content-Type": "application/scim+json"
+    };
 
     return await axios({
         data: searchUserdata,
-        headers: {
-            Authorization: authToken,
-            "Content-Type": "application/scim+json"
-        },
+        headers: headers,
         method: "post",
         url: url
     });
@@ -77,8 +78,8 @@ const createUser = async (userData) => {
     let userCreated = false;
 
     try {
-        const url = `https://${config.host}` + (config.tenantName && config.tenantName !== ""
-            ? `/t/${config.tenantName}/` : "/") + "scim2/Users";
+        const url = "https://" + config.host + (config.tenantName && config.tenantName !== ""
+            ? "/t/" + config.tenantName + "/" : "/") + "scim2/Users";
         let authToken = "";
 
         if (config.isCloudSetup) {
@@ -93,12 +94,14 @@ const createUser = async (userData) => {
             authToken = `Basic ${config.basicAuthCredentials}`;
         }
 
+        const headers = {
+            Authorization: authToken,
+            "Content-Type": "application/json"
+        };
+
         await axios({
             data: data,
-            headers: {
-                Authorization: authToken,
-                "Content-Type": "application/json"
-            },
+            headers: headers,
             method: "post",
             url: url
         }).then(response => {
@@ -138,8 +141,8 @@ const deleteUsers = async () => {
     let userCount = 0;
     let deletedCount = 0;
 
-    const url = `https://${config.host}` + (config.tenantName && config.tenantName !== ""
-        ? `/t/${config.tenantName}/` : "/") + "scim2/Users";
+    const url = "https://" + config.host + (config.tenantName && config.tenantName !== ""
+        ? "/t/" + config.tenantName + "/" : "/") + "scim2/Users";
     let authToken = "";
 
     if (config.isCloudSetup) {
@@ -154,15 +157,17 @@ const deleteUsers = async () => {
         authToken = `Basic ${config.basicAuthCredentials}`;
     }
 
+    const headers = {
+        Authorization: authToken,
+        "Content-Type": "application/json"
+    };
+
     for await (const userId of readLine) {
         userCount += 1;
 
         try {
             await axios({
-                headers: {
-                    Authorization: authToken,
-                    "Content-Type": "application/json"
-                },
+                headers: headers,
                 method: "delete",
                 url: url + `/${userId}`
             }).then(response => {
@@ -187,18 +192,20 @@ const deleteUsers = async () => {
 
 const obtainBearerToken = async () => {
     let token = "";
+    const headers = {
+        "Content-Type": "application/x-www-form-urlencoded"
+    };
+    const data = qs.stringify({
+        client_id: config.bearerTokenClientId,
+        grant_type: config.bearerTokenGrantType,
+        password: config.bearerTokenPassword,
+        scope: config.bearerTokenScope,
+        username: config.bearerTokenUsername
+    });
 
     await axios({
-        data: qs.stringify({
-            client_id: config.bearerTokenClientId,
-            grant_type: config.bearerTokenGrantType,
-            password: config.bearerTokenPassword,
-            scope: config.bearerTokenScope,
-            username: config.bearerTokenUsername
-        }),
-        headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-        },
+        data: data,
+        headers: headers,
         method: "post",
         url: `https://${config.host}/oauth2/token`
     }).then((response) => {
