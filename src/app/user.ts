@@ -2,18 +2,18 @@ import axios from "axios";
 
 const fs = require("fs");
 const readline = require("readline");
-const qs = require('qs');
+const qs = require("qs");
 
 const config = require("./../../config.json");
 
 /**
- * Find availability of a user with SCIM2 API
+ * Find availability of a user with SCIM2 API.
  */
 const searchUser = async (req) => {
-    // Set filter for user search
-    let filter = `userName sw ${req.body.username}`;
-
-    let url = `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `scim2/Users/.search`;
+    // Set filter for user search.
+    const filter = `userName sw ${req.body.username}`;
+    const url = `https://${config.host}` + (config.tenantName && config.tenantName !== ""
+        ? `/t/${config.tenantName}/` : "/") + "scim2/Users/.search";
     let authToken = "";
 
     if (config.isCloudSetup) {
@@ -28,55 +28,57 @@ const searchUser = async (req) => {
         authToken = `Basic ${config.basicAuthCredentials}`;
     }
 
-    let searchUserdata = {
-        schemas: ["urn:ietf:params:scim:api:messages:2.0:SearchRequest"],
-        attributes: ["name.familyName", "userName"],
-        filter: filter,
-        domain: "PRIMARY",
-        startIndex: 1,
+    const searchUserdata = {
+        attributes: [ "name.familyName", "userName" ],
         count: 100,
+        domain: "PRIMARY",
+        filter: filter,
+        schemas: [ "urn:ietf:params:scim:api:messages:2.0:SearchRequest" ],
+        startIndex: 1
     };
 
     return await axios({
-        method: "post",
-        url: url,
-        headers: {
-            "Content-Type": "application/scim+json",
-            Authorization: authToken,
-        },
         data: searchUserdata,
+        headers: {
+            Authorization: authToken,
+            "Content-Type": "application/scim+json"
+        },
+        method: "post",
+        url: url
     });
 };
 
 /**
- * Create user with SCIM2 API
+ * Create user with SCIM2 API.
  */
 const createUser = async (userData) => {
-    let data = JSON.stringify({
-        schemas: [],
-        name: {
-            familyName: userData.familyName,
-            givenName: userData.givenName,
-        },
+    const data = JSON.stringify({
         displayName: userData.givenName + " " + userData.familyName,
-        userName: userData.userName,
-        password: userData.password,
-        emails: [{
+        emails: [
+            {
                 primary: true,
-                value: config.isCloudSetup ? `${config.userStoreDomain}/${userData.homeEmail}` : userData.homeEmail,
-                type: "home"
+                type: "home",
+                value: config.isCloudSetup ? `${config.userStoreDomain}/${userData.homeEmail}` : userData.homeEmail
             },
             {
-                value: userData.workEmail,
-                type: "work"
-            },
-        ]
+                type: "work",
+                value: userData.workEmail
+            }
+        ],
+        name: {
+            familyName: userData.familyName,
+            givenName: userData.givenName
+        },
+        password: userData.password,
+        schemas: [],
+        userName: userData.userName
     });
 
     let userCreated = false;
 
     try {
-        let url = `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `scim2/Users`;
+        const url = `https://${config.host}` + (config.tenantName && config.tenantName !== ""
+            ? `/t/${config.tenantName}/` : "/") + "scim2/Users";
         let authToken = "";
 
         if (config.isCloudSetup) {
@@ -92,17 +94,18 @@ const createUser = async (userData) => {
         }
 
         await axios({
-            method: "post",
-            url: url,
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: authToken,
-            },
             data: data,
+            headers: {
+                Authorization: authToken,
+                "Content-Type": "application/json"
+            },
+            method: "post",
+            url: url
         }).then(response => {
             // Append succesfully created users to a file.
             if (response.status == 201) {
-                fs.appendFile("data/user_list.txt", response?.data?.id + "\n", function (err) {});
+                // eslint-disable-next-line @typescript-eslint/no-empty-function
+                fs.appendFile("data/user_list.txt", response?.data?.id + "\n", function () {});
                 userCreated = true;
             }
         }).catch((error) => {
@@ -123,19 +126,20 @@ const createUser = async (userData) => {
 };
 
 /**
- * Delete stored set of users with SCIM2 API
+ * Delete stored set of users with SCIM2 API.
  */
- const deleteUsers = async (res) => {
+const deleteUsers = async () => {
     const fileStream = fs.createReadStream("data/user_list.txt");
     const readLine= readline.createInterface({
-        input: fileStream,
-        crlfDelay: Infinity
+        crlfDelay: Infinity,
+        input: fileStream
     });
 
     let userCount = 0;
     let deletedCount = 0;
 
-    let url = `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `scim2/Users`;
+    const url = `https://${config.host}` + (config.tenantName && config.tenantName !== ""
+        ? `/t/${config.tenantName}/` : "/") + "scim2/Users";
     let authToken = "";
 
     if (config.isCloudSetup) {
@@ -152,14 +156,15 @@ const createUser = async (userData) => {
 
     for await (const userId of readLine) {
         userCount += 1;
+
         try {
             await axios({
-                method: "delete",
-                url: url + `/${userId}`,
                 headers: {
-                    "Content-Type": "application/json",
                     Authorization: authToken,
-                }
+                    "Content-Type": "application/json"
+                },
+                method: "delete",
+                url: url + `/${userId}`
             }).then(response => {
                 if (response.status == 204) {
                     deletedCount += 1;
@@ -171,28 +176,31 @@ const createUser = async (userData) => {
         } catch (error) {
             console.log(`Error deleting the user with id ${userId}`);
         }
-    };
+    }
 
-    fs.writeFile("data/user_list.txt", "", function (err) {});
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    fs.writeFile("data/user_list.txt", "", function () {});
     console.log(`${deletedCount} users deleted from ${userCount} user records.`);
+
     return `${deletedCount} users deleted from ${userCount} user records.`;
 };
 
 const obtainBearerToken = async () => {
     let token = "";
+
     await axios({
-        method: "post",
-        url: `https://${config.host}/oauth2/token`,
+        data: qs.stringify({
+            client_id: config.bearerTokenClientId,
+            grant_type: config.bearerTokenGrantType,
+            password: config.bearerTokenPassword,
+            scope: config.bearerTokenScope,
+            username: config.bearerTokenUsername
+        }),
         headers: {
             "Content-Type": "application/x-www-form-urlencoded"
         },
-        data: qs.stringify({
-            grant_type: config.bearerTokenGrantType,
-            client_id: config.bearerTokenClientId,
-            username: config.bearerTokenUsername,
-            password: config.bearerTokenPassword,
-            scope: config.bearerTokenScope
-        })
+        method: "post",
+        url: `https://${config.host}/oauth2/token`
     }).then((response) => {
         token = response.data["access_token"];
     }).catch((error) => {
@@ -200,10 +208,12 @@ const obtainBearerToken = async () => {
     });
 
     return token;
-}
+};
 
 const formatUsername = (providedName) => {
+    // eslint-disable-next-line no-useless-escape, max-len
     const validRegex = /^[^!@#$%\^&\*\(\)_\+\-=\[\]{};':"\\|,.<>\/?]+(.)*[^!@#$%\^&\*\(\)_\+\-=\[\]{};':"\\|,.<>\/?]+@(.)+\.(.)+$/;
+    // eslint-disable-next-line no-useless-escape
     const invalidRegex1 = /[!@#$%\^&\*\(\)_\+\-=\[\]{};':"\\|,.<>\/?]{2,}/;
 
     if (config.isCloudSetup) {
@@ -218,16 +228,17 @@ const formatUsername = (providedName) => {
         providedName = providedName.split("@")[0] + "post@fidotest.com";
 
         if (invalidRegex1.test(providedName)) {
-            return [true, providedName.replace(invalidRegex1, "")];
+            return [ true, providedName.replace(invalidRegex1, "") ];
         }
-        return [true, providedName];
+
+        return [ true, providedName ];
     } else if (invalidRegex1.test(providedName)) {
-        return [true, providedName.replace(invalidRegex1, "")];
+        return [ true, providedName.replace(invalidRegex1, "") ];
     }
 
-    return [false, providedName];
-}
+    return [ false, providedName ];
+};
 
 module.exports = {
-    searchUser, createUser, deleteUsers, formatUsername
-}
+    createUser, deleteUsers, formatUsername, searchUser
+};

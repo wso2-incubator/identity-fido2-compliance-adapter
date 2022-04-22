@@ -1,305 +1,274 @@
-import express, { response } from "express";
 import axios from "axios";
+import express from "express";
 import encode from "nodejs-base64-encode";
 
-const base64url = require("base64url");
-const userOps = require("./user");
-const getCertificateInfo = require("@simplewebauthn/server/dist/helpers/getCertificateInfo");
-const qs = require('qs');
+const qs = require("qs");
 
 const config = require("./../../config.json");
+const userOps = require("./user");
 
-let challenge: any;
 let authClient: any;
 let token: any;
 let invalidUsername: any = false;
 let providedUsername = "";
 
 export default ({ app }: { app: express.Application }) => {
-  /**
-   * Health Check endpoints.
-   */
-  app.get("/status", (req, res) => {
-    res.status(200).end("Connection Successful");
-  });
-  app.head("/status", (req, res) => {
-    res.status(200).end();
-  });
-
-  /**
-   * Credential Creation Options.
-   */
-  const appId = `{'appId':'http://localhost:61904'}`;
-  let requestId;
-
-  app.post("/attestation/options", async (req, res) => {
-    console.log(`\nRequest @ /attestation/options`);
-    console.log("user >> ", req.body.username, req.body.displayName);
-
-    let extensions = { "example.extension": true };
-    let attestationLogic = req.body.attestation == "direct" ? "direct" : "none";
-    let username = userOps.formatUsername(req.body.username);
-    invalidUsername = username[0];
-    username = username[1];
-    providedUsername = req.body.username;
-
-    // Set user data required to create a user in wso2is.
-    let userData = {
-      familyName: req.body.displayName.split(" ")[1],
-      givenName: req.body.displayName.split(" ")[0],
-      userName: username,
-      password: config.userPassword,
-      homeEmail:
-        req.body.displayName.split(" ")[0].toLowerCase() + `_home@gmail.com`,
-      workEmail:
-        req.body.displayName.split(" ")[0].toLowerCase() + `_work@gmail.com`
-    };
-
-    // Create user.
-    const userCreationResponse = await userOps.createUser(userData);
-    if (!userCreationResponse) {
-      res.send({
-        status: "failed",
-        errorMessage: "Unable to create a user",
-      });
-    }
-
-    authClient = encode.encode(`${config.clientID}:${config.clientSecret}`, "base64");
-    let url = `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + "oauth2/token";
-
-    // Obtain an access token using the password grant call and 'internal_login' scope.
-    await axios({
-      method: "post",
-      url: url,
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Basic ${authClient}`,
-      },
-      data: qs.stringify({
-        grant_type: "password",
-        username: userData.userName,
-        password: userData.password,
-        scope: "internal_login"
-      })
-    }).then((response) => {
-      token = response.data["access_token"];
-    }).catch((error) => {
-      console.log("Error while retrieving access token", error);
+    /**
+     * Health Check endpoints.
+     */
+    app.get("/status", (req, res) => {
+        res.status(200).end("Connection Successful");
+    });
+    app.head("/status", (req, res) => {
+        res.status(200).end();
     });
 
-    if (
-      req.body.authenticatorSelection &&
-      req.body.authenticatorSelection.requireResidentKey == false
-    ) {
-      // start-registration
-      await axios({
-        method: "post",
-        url: `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + "api/users/v2/me/webauthn/start-registration",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Authorization: `Bearer ${token}`,
-        },
-        data: appId,
-      })
-        .then((usernamelessRegistrationResponse) => {
-          requestId = usernamelessRegistrationResponse.data.requestId;
+    /**
+     * Credential Creation Options.
+     */
+    const appId = "{'appId':'http://localhost:61904'}";
+    let requestId;
 
-          let user = usernamelessRegistrationResponse.data.publicKeyCredentialCreationOptions.user;
-          if (config.isCloudSetup) {
-            if (invalidUsername) {
-              user.name = providedUsername;
-            } else {
-              user.name = user.name.split("@")[0].substring(4);
-            }
-          }
+    app.post("/attestation/options", async (req, res) => {
+        console.log("\nRequest @ /attestation/options");
+        console.log("user >> ", req.body.username, req.body.displayName);
 
-          // Construct response to the conformance tools.
-          let returnData = {
-            status: "ok",
-            errorMessage: "",
-            rp:
-              usernamelessRegistrationResponse.data
-                .publicKeyCredentialCreationOptions.rp,
-            user: user,
-            challenge:
-              usernamelessRegistrationResponse.data
-                .publicKeyCredentialCreationOptions.challenge,
-            pubKeyCredParams:
-              usernamelessRegistrationResponse.data
-                .publicKeyCredentialCreationOptions.pubKeyCredParams,
-            timeout:
-              usernamelessRegistrationResponse.data
-                .publicKeyCredentialCreationOptions.timeout,
-            excludeCredentials: 
-              usernamelessRegistrationResponse.data.publicKeyCredentialCreationOptions.excludeCredentials,
-            authenticatorSelection: {
-              requireResidentKey: usernamelessRegistrationResponse.data
-                .publicKeyCredentialCreationOptions.authenticatorSelection.requireResidentKey,
-              userVerification: usernamelessRegistrationResponse.data
-                .publicKeyCredentialCreationOptions.authenticatorSelection.userVerification
+        const extensions = { "example.extension": true };
+        const attestationLogic = req.body.attestation == "direct" ? "direct" : "none";
+        let username = userOps.formatUsername(req.body.username);
+
+        invalidUsername = username[0];
+        username = username[1];
+        providedUsername = req.body.username;
+
+        // Set user data required to create a user in wso2is.
+        const userData = {
+            familyName: req.body.displayName.split(" ")[1],
+            givenName: req.body.displayName.split(" ")[0],
+            homeEmail: req.body.displayName.split(" ")[0].toLowerCase() + "_home@gmail.com",
+            password: config.userPassword,
+            userName: username,
+            workEmail: req.body.displayName.split(" ")[0].toLowerCase() + "_work@gmail.com"
+        };
+
+        // Create user.
+        const userCreationResponse = await userOps.createUser(userData);
+
+        if (!userCreationResponse) {
+            res.send({
+                errorMessage: "Unable to create a user",
+                status: "failed"
+            });
+        }
+
+        authClient = encode.encode(`${config.clientID}:${config.clientSecret}`, "base64");
+        const url = `https://${config.host}` + (config.tenantName && config.tenantName !== ""
+            ? `/t/${config.tenantName}/` : "/") + "oauth2/token";
+
+        // Obtain an access token using the password grant call and 'internal_login' scope.
+        await axios({
+            data: qs.stringify({
+                grant_type: "password",
+                password: userData.password,
+                scope: "internal_login",
+                username: userData.userName
+            }),
+            headers: {
+                Authorization: `Basic ${authClient}`,
+                "Content-Type": "application/x-www-form-urlencoded"
             },
-            attestation: attestationLogic,
-            extensions: extensions,
-          };
-
-          challenge =
-            usernamelessRegistrationResponse.data
-              .publicKeyCredentialCreationOptions.challenge;
-
-          res.send(returnData);
-        })
-        .catch((err) => {
-          res.send({
-            status: "failed",
-            errorMessage: err.message,
-          });
+            method: "post",
+            url: url
+        }).then((response) => {
+            token = response.data["access_token"];
+        }).catch((error) => {
+            console.log("Error while retrieving access token", error);
         });
-    } else {
-      // start-usernameless-registration
-      await axios({
-        method: "post",
-        url: `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + "api/users/v2/me/webauthn/start-usernameless-registration",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Authorization: `Bearer ${token}`,
-        },
-        data: appId,
-      })
-        .then((usernamelessRegistrationResponse) => {
-          requestId = usernamelessRegistrationResponse.data.requestId;
 
-          let user = usernamelessRegistrationResponse.data.publicKeyCredentialCreationOptions.user;
-          if (config.isCloudSetup) {
-            if (invalidUsername) {
-              user.name = providedUsername;
-            } else {
-              user.name = user.name.split("@")[0].substring(4);
-            }
-          }
+        if (
+            req.body.authenticatorSelection &&
+      req.body.authenticatorSelection.requireResidentKey == false
+        ) {
+            // start-registration.
+            await axios({
+                data: appId,
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/x-www-form-urlencoded"
+                },
+                method: "post",
+                url: `https://${config.host}` + (config.tenantName && config.tenantName !== ""
+                    ? `/t/${config.tenantName}/` : "/") + "api/users/v2/me/webauthn/start-registration"
+            }).then((usernamelessRegistrationResponse) => {
+                requestId = usernamelessRegistrationResponse.data.requestId;
 
-          // Response to the conformance tools
-          let returnData = {
-            status: "ok",
-            errorMessage: "",
-            rp:
-              usernamelessRegistrationResponse.data
-                .publicKeyCredentialCreationOptions.rp,
-            user: user,
-            challenge:
-              usernamelessRegistrationResponse.data
-                .publicKeyCredentialCreationOptions.challenge,
-            pubKeyCredParams:
-              usernamelessRegistrationResponse.data
-                .publicKeyCredentialCreationOptions.pubKeyCredParams,
-            timeout:
-              usernamelessRegistrationResponse.data
-                .publicKeyCredentialCreationOptions.timeout,
-            excludeCredentials:
-              usernamelessRegistrationResponse.data
-                .publicKeyCredentialCreationOptions.excludeCredentials,
-            authenticatorSelection:
-              usernamelessRegistrationResponse.data
-                .publicKeyCredentialCreationOptions.authenticatorSelection,
-            attestation:
-              usernamelessRegistrationResponse.data
-                .publicKeyCredentialCreationOptions.attestation,
-            extensions:
-              usernamelessRegistrationResponse.data
-                .publicKeyCredentialCreationOptions.extensions,
-          };
+                const user = usernamelessRegistrationResponse.data.publicKeyCredentialCreationOptions.user;
 
-          challenge =
-            usernamelessRegistrationResponse.data
-              .publicKeyCredentialCreationOptions.challenge;
+                if (config.isCloudSetup) {
+                    if (invalidUsername) {
+                        user.name = providedUsername;
+                    } else {
+                        user.name = user.name.split("@")[0].substring(4);
+                    }
+                }
 
-          res.send(returnData);
-        })
-        .catch((err) => {
-          console.log(">>> err >>> ", err);
+                // Construct response to the conformance tools.
+                const returnData = {
+                    attestation: attestationLogic,
+                    authenticatorSelection: {
+                        requireResidentKey: usernamelessRegistrationResponse.data
+                            .publicKeyCredentialCreationOptions.authenticatorSelection.requireResidentKey,
+                        userVerification: usernamelessRegistrationResponse.data
+                            .publicKeyCredentialCreationOptions.authenticatorSelection.userVerification
+                    },
+                    challenge: usernamelessRegistrationResponse.data.publicKeyCredentialCreationOptions.challenge,
+                    errorMessage: "",
+                    excludeCredentials: usernamelessRegistrationResponse.data
+                        .publicKeyCredentialCreationOptions.excludeCredentials,
+                    extensions: extensions,
+                    pubKeyCredParams: usernamelessRegistrationResponse.data
+                        .publicKeyCredentialCreationOptions.pubKeyCredParams,
+                    rp: usernamelessRegistrationResponse.data.publicKeyCredentialCreationOptions.rp,
+                    status: "ok",
+                    timeout: usernamelessRegistrationResponse.data.publicKeyCredentialCreationOptions.timeout,
+                    user: user
+                };
 
-          res.send({
-            status: "failed",
-            errorMessage: err.message,
-          });
-        });
-    }
-  });
+                res.send(returnData);
+            }).catch((err) => {
+                res.send({
+                    errorMessage: err.message,
+                    status: "failed"
+                });
+            });
+        } else {
+            // start-usernameless-registration.
+            await axios({
+                data: appId,
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/x-www-form-urlencoded"
+                },
+                method: "post",
+                url: `https://${config.host}` + (config.tenantName && config.tenantName !== "" 
+                    ? `/t/${config.tenantName}/` : "/") + "api/users/v2/me/webauthn/start-usernameless-registration"
+            }).then((usernamelessRegistrationResponse) => {
+                requestId = usernamelessRegistrationResponse.data.requestId;
 
-  /**
-   * Authenticator Attestation Response.
-   */
-  app.post("/attestation/result", async (req, res) => {
-    console.log(`\nRequest @ /attestation/results`);
+                const user = usernamelessRegistrationResponse.data.publicKeyCredentialCreationOptions.user;
 
-    // Arrange data to be sent to the server.
-    let data = {
-      credential: {
-        clientExtensionResults: req.body.getClientExtensionResults ?? {},
-        id: req.body.id,
-        response: req.body.response,
-        type: req.body.type,
-      },
-      requestId: requestId,
-    };
+                if (config.isCloudSetup) {
+                    if (invalidUsername) {
+                        user.name = providedUsername;
+                    } else {
+                        user.name = user.name.split("@")[0].substring(4);
+                    }
+                }
+
+                // Response to the conformance tool.
+                const returnData = {
+                    attestation: usernamelessRegistrationResponse.data.publicKeyCredentialCreationOptions.attestation,
+                    authenticatorSelection: usernamelessRegistrationResponse.data
+                        .publicKeyCredentialCreationOptions.authenticatorSelection,
+                    challenge: usernamelessRegistrationResponse.data.publicKeyCredentialCreationOptions.challenge,
+                    errorMessage: "",
+                    excludeCredentials: usernamelessRegistrationResponse.data
+                        .publicKeyCredentialCreationOptions.excludeCredentials,
+                    extensions: usernamelessRegistrationResponse.data.publicKeyCredentialCreationOptions.extensions,
+                    pubKeyCredParams: usernamelessRegistrationResponse.data
+                        .publicKeyCredentialCreationOptions.pubKeyCredParams,
+                    rp: usernamelessRegistrationResponse.data.publicKeyCredentialCreationOptions.rp,
+                    status: "ok",
+                    timeout: usernamelessRegistrationResponse.data.publicKeyCredentialCreationOptions.timeout,
+                    user: user
+                };
+
+                res.send(returnData);
+            }).catch((err) => {
+                console.log(">>> err >>> ", err);
+
+                res.send({
+                    errorMessage: err.message,
+                    status: "failed"
+                });
+            });
+        }
+    });
 
     /**
-     * These parameters are not supported by the yubico data structure. Therefore need to remove before 
-     * sending to the backend implementation. Otherwise will throw data conversion exception.
+     * Authenticator Attestation Response.
      */
-    if (data.credential.response.getTransports) {
-      delete data.credential.response.getTransports;
-    }
-    if (data.credential.response.getAuthenticatorData) {
-      data.credential.response.authenticatorData = data.credential.response.getAuthenticatorData;
-      delete data.credential.response.getAuthenticatorData;
-    }
-    if (data.credential.response.getPublicKey) {
-      delete data.credential.response.getPublicKey;
-    }
-    if (data.credential.response.getPublicKeyAlgorithm) {
-      delete data.credential.response.getPublicKeyAlgorithm;
-    }
+    app.post("/attestation/result", async (req, res) => {
+        console.log("\nRequest @ /attestation/results");
 
-    // Finish registration request.
-    let x = await axios({
-      method: "post",
-      url: `https://${config.host}` + (config.tenantName && config.tenantName !== "" ? `/t/${config.tenantName}/` : "/") + `api/users/v2/me/webauthn/finish-registration`,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      data: data,
-    })
-      .then((response) => {
-        res.send({
-          status: "ok",
-          errorMessage: "",
+        // Arrange data to be sent to the server.
+        const data = {
+            credential: {
+                clientExtensionResults: req.body.getClientExtensionResults ?? {},
+                id: req.body.id,
+                response: req.body.response,
+                type: req.body.type
+            },
+            requestId: requestId
+        };
+
+        /**
+         * These parameters are not supported by the yubico data structure. Therefore need to remove before 
+         * sending to the backend implementation. Otherwise will throw data conversion exception.
+         */
+        if (data.credential.response.getTransports) {
+            delete data.credential.response.getTransports;
+        }
+        if (data.credential.response.getAuthenticatorData) {
+            data.credential.response.authenticatorData = data.credential.response.getAuthenticatorData;
+            delete data.credential.response.getAuthenticatorData;
+        }
+        if (data.credential.response.getPublicKey) {
+            delete data.credential.response.getPublicKey;
+        }
+        if (data.credential.response.getPublicKeyAlgorithm) {
+            delete data.credential.response.getPublicKeyAlgorithm;
+        }
+
+        // Finish registration request.
+        await axios({
+            data: data,
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json"
+            },
+            method: "post",
+            url: `https://${config.host}` + (config.tenantName && config.tenantName !== ""
+                ? `/t/${config.tenantName}/` : "/") + "api/users/v2/me/webauthn/finish-registration"
+        }).then(() => {
+            res.send({
+                errorMessage: "",
+                status: "ok"
+            });
+        }).catch((error) => {
+            res.send({
+                errorMessage: error.message,
+                status: "failed"
+            });
         });
-      })
-      .catch((error) => {
-        res.send({
-          status: "failed",
-          errorMessage: error.message,
+    });
+
+    /**
+     * Delete users.
+     */
+    app.delete("/adapter/users/delete", async (req, res) => {
+        console.log("\nRequest @ /adapter/users/delete");
+
+        userOps.deleteUsers().then((response) => {
+            res.send({
+                message: response,
+                status: "success"
+            });
+        }).catch((error) => {
+            res.send({
+                errorMessage: error,
+                status: "failed"
+            });
         });
-      });
-  });
-
-  /**
-   * Delete users.
-   */
-  app.delete("/adapter/users/delete", async (req, res) => {
-    console.log(`\nRequest @ /adapter/users/delete`);
-
-    userOps.deleteUsers().then((response) => {
-      res.send({
-        status: "success",
-        message: response,
-      });
-    }).catch((error) => {
-      res.send({
-        status: "failed",
-        errorMessage: error,
-      });
-    })
-  });
+    });
 };
