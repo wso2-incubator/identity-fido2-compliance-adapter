@@ -9,7 +9,7 @@ const userOps = require("./user");
 
 let authClient: any;
 let token: any;
-let invalidUsername: any = false;
+let invalidUsername: boolean = false;
 let providedUsername = "";
 
 export default ({ app }: { app: express.Application }) => {
