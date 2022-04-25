@@ -1,4 +1,17 @@
 {
-  "sampleAppId": "rQo3iAdNWqXziqursNNpxhTwW2Ua",
-  "host": "localhost"
+  "clientID": "<clientId>",
+  "clientSecret": "<clientSecret>",
+  "host": "127.0.0.1",
+  "tenantName": "<tenantName>",
+  "redirectUri": "<redirectUrl>",
+  "basicAuthCredentials": "YWRtaW46YWRtaW4=",
+  "authRequestRefererHost": "localhost",
+  "userPassword": "User@123",
+  "isCloudSetup": false,
+  "bearerTokenGrantType": "",
+  "bearerTokenClientId": "",
+  "bearerTokenUsername": "",
+  "bearerTokenPassword": "",
+  "bearerTokenScope": "",
+  "userStoreDomain": ""
 }

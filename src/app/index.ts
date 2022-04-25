@@ -1,9 +1,9 @@
-import registration from "./registration";
 import authentication from "./authentication";
-import metadataService from "./metadata-service";
+import interopApp from "./interop-testing/interopApp";
+import registration from "./registration";
 
 export default async ({ expressApp }) => {
-  await authentication({ app: expressApp });
-  await registration({ app: expressApp });
-  await metadataService({ app: expressApp });
+    await authentication({ app: expressApp });
+    await registration({ app: expressApp });
+    await interopApp({ app: expressApp });
 };

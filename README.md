@@ -3,8 +3,8 @@
 ## Features
 
 - Map Registration and Authentication requests
-- User Creation
-- Metadata Service
+- User Creation and Deletion
+- Host Interoperability Web App
 
 ## Tech
 
@@ -13,108 +13,107 @@
 
 ## Setup Guide
 
-### Downloading and Installation - FIDO Conformance tools
+### Set up FIDO Conformance Testing Tool
 
-1. Request FIDO Conformance tools from FIDO Alliance.
+1. [Request FIDO conformance testing tool](https://fidoalliance.org/test-tool-access-request/) from FIDO Alliance.
 
+2. Download and install the FIDO conformance testing tool.
+
+3. Launch the application and select **FIDO2 Server - MDS3 Tests**.
+
+3. Enter `https://localhost:4000` as the server url.
+
+> Note: Tool (v1.6.42 experimental) will work only on macOS and Windows operating systems.
+
+### Set up Identity Server
+
+1. Download and start WSO2 identity server and login to the console. Alternatively login to Asgardeo for cloud setup.
+
+2. Create a sample application for conformance testing.
+
+### Compliance Adapter Setup
+
+> fido2-compliance-adapter requires **Node.js** to run.
+
+1. Clone the github project.
 ```sh
-https://fidoalliance.org/test-tool-access-request/
+git clone git@github.com:wso2-incubator/identity-fido2-compliance-adapter.git
 ```
 
-2. Download and install the FIDO conformance tools from FIDO Alliance.
-
-Note : Tools (v1.5.2) will work only on macOS and Windows.
-
-### Adater Setup
-
-fido2-compliance-adapter requires **Node.js** to run.
-
-1. Clone the Github Project
-
+2. Install dependencies by executing the following command.
 ```sh
-git clone <github link>
-```
-
-2. Install the dependencies and devDependencies and start the server.
-
-```sh
-cd /fido2-adapter
+cd /identity-fido2-compliance-adapter
 npm install
 ```
 
-3. Add Sample App ID to the adapter
+3. Configure the adapter by adding following configs to the `config.json` file.
 
-```sh
-Open  `config.json`
-Change sampleAppId to your sample app id
-Change the other configurations if needed
-```
+| Configuration | Description | Sample value |
+| -- | -- | -- |
+| `clientID` | The client ID of the application created | `ZECYcLyBtHDkLtpOSSXKF85jQ2sa` |
+| `clientSecret` | The client secret of the application created | `1_6rdIRx5U3F3mTyKL19vTW9lD0a` |
+| `host` | Host address of the server | `127.0.0.1` (`api.asgardeo.io` for cloud) |
+| `tenantName` | Name of the tenant/ organization. Leave this empty if you're not configuring in a tenant environment | `myorg` |
+| `redirectUri` | Redirect url provided for the created application | `http://localhost.com:8080/pickup-dispatch/oauth2client` |
+| `basicAuthCredentials` | Base64 encoded `username:password` for the basic authentication (Only requires in on-prem setup) | `YWRtaW46YWRtaW4=` |
+| `authRequestRefererHost` | Referer host to be sent in the authentication request. Cannot use an ip address for this field | `localhost` (`accounts.asg.io` for cloud) |
+| `userPassword` | Password for the adapter created user accounts. No need to change this value unless you have enforced different password policies. | `User@123` |
+| `isCloudSetup` | Boolean indicating whether you're running the adapter against cloud setup or on-prem setup | `false` |
+| `bearerTokenGrantType` | Grant type required to obtain bearer token (Only requires in cloud setup) |  |
+| `bearerTokenClientId` | Client ID to obtain bearer token (Only requires in cloud setup) |  |
+| `bearerTokenUsername` | Username to obtain bearer token (Only requires in cloud setup) |  |
+| `bearerTokenPassword` | Password of the above provided user to obtain bearer token (Only requires in cloud setup) |  |
+| `bearerTokenScope` | Scope for the bearer token (Only requires in cloud setup) |  |
+| `userStoreDomain` | User store domain name (Only requires in cloud setup) |  |
 
-4. Start the Adapter
+4. Follow below commands to add certificates to the adapter.
 
+    - Install **openssl**.
+
+    - Generate certificate by executing the below command.
+    ```sh
+    cd /security
+    openssl req -nodes -new -x509 -keyout server.key -out server.cert
+    ```
+
+    - Allow unauthorized TLS by executing the below command.
+    ```sh
+    export NODE_TLS_REJECT_UNAUTHORIZED='0'
+    ```
+
+5. Download `index.html` file from [fido-interop-webapp](https://github.com/fido-alliance/fido2-interop-webapp) repository and copy to `src/app/interop-testing` directory.
+
+6. Start the adapter by executing following command.
 ```sh
 npm start
 ```
 
-### Add Certificates
+## Run FIDO Conformance Tests
 
-Install **openssl**
+1. Download server metadata by clicking **DOWNLOAD SERVER METADATA** button. You are required to upload the extracted metadata files to the identity server inorder to pass metadata tests.
+2. Select the required test cases under **Server Tests**.
+3. Click RUN to start the testing process
 
-1. Generate Certificate
+## Additional Configurations
 
-```sh
-cd /security
-openssl req -nodes -new -x509 -keyout server.key -out server.cert
-```
-
-2. Allow unauthorized TLS
-
-```sh
-export NODE_TLS_REJECT_UNAUTHORIZED='0'
-```
-
-3. Restart server
-
-### WSO2 Identity Server and Sample App Setup
+### Sample App Setup in WSO2 Identity Server
 
 1.  Start WSO2 IS
 
 2.  Setup the sample application (Pickup-Dispatch App)
 
-    Refer WSO2 IS Deploying the Sample Applications documentation to deploy the pickup-dispatch webapp.
-
-    ```sh
-        https://is.docs.wso2.com/en/5.9.0/learn/deploying-the-sample-app/
-    ```
+    Refer [WSO2 IS Deploying the Sample Applications documentation](https://is.docs.wso2.com/en/latest/learn/deploying-the-sample-app/#deploying-the-sample-applications) to deploy the pickup-dispatch webapp.
 
     After successful deployment, enable login with FIDO2 for the deployed pickup-dispatch webapp.
     login to Management console
 
-    ```sh
-        Username : admin
-        Password : admin
+    ```
+    Username : admin
+    Password : admin
     ```
 
-    Select Service Providers -> List. Then click edit for the deployed application. Select Local & Outbound Authentication Configuration and click Local Authentication as fido.
+    Select `Service Providers -> List`. Then click edit for the deployed application. Select Local & Outbound Authentication Configuration and click Local Authentication as fido.
 
     Add any claim configuration you prefer under Claim Configuration tab to enable consent page.
 
     Update the settings and reload the WSO2 IS server.
-
-### Run the FIDO conformance tool
-
-1. Start FIDO Conformance tool
-
-2. Select **FIDO2.0 Tests**
-
-3. Add the server URL under TEST CONFIGURATIONS - Server URL
-
-   ```sh
-       https://localhost:4000
-   ```
-
-4. Download server metadata by clicking DOWNLOAD SERVER METADATA button
-5. Extract the downloaded metadata statements and copy them to the fido-conformance-mds folder in the adapter
-6. Select the required test cases under Server Tests
-
-7. Click RUN to start the testing process
