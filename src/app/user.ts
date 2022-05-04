@@ -1,7 +1,6 @@
 import axios from "axios";
 
 const fs = require("fs");
-const readline = require("readline");
 const qs = require("qs");
 
 const config = require("./../../config.json");
@@ -132,11 +131,7 @@ const createUser = async (userData) => {
  * Delete stored set of users with SCIM2 API.
  */
 const deleteUsers = async () => {
-    const fileStream = fs.createReadStream("data/user_list.txt");
-    const readLine= readline.createInterface({
-        crlfDelay: Infinity,
-        input: fileStream
-    });
+    const userFileContent = fs.readFileSync("data/user_list.txt", "utf-8");
 
     let userCount = 0;
     let deletedCount = 0;
@@ -162,7 +157,7 @@ const deleteUsers = async () => {
         "Content-Type": "application/json"
     };
 
-    for await (const userId of readLine) {
+    await userFileContent.split(/\r?\n/).forEach(async userId => {
         userCount += 1;
 
         try {
@@ -181,7 +176,7 @@ const deleteUsers = async () => {
         } catch (error) {
             console.log(`Error deleting the user with id ${userId}`);
         }
-    }
+    });
 
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     fs.writeFile("data/user_list.txt", "", function () {});
