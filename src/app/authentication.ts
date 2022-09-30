@@ -52,8 +52,7 @@ export default ({ app }: { app: express.Application }) => {
             + "oauth2/authorize?scope=openid&response_type=code&redirect_uri=" + config.redirectUri
             + "&client_id=" + client_id;
         const headers = {
-            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*",  
-            Authorization: `Basic ${auth}`,
+            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*",
             Connection: "keep-alive",
             ContentType: "application/json",
             Host: "localhost:9443"
@@ -211,7 +210,6 @@ export default ({ app }: { app: express.Application }) => {
             ? "/t/" + config.tenantName + "/" : "/") + "commonauth";
         const headers = {
             Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*",
-            Authorization: `Basic ${auth}`,
             Connection: "keep-alive",
             "Content-Type": "application/x-www-form-urlencoded",
             Referer: referer,
