@@ -33,7 +33,7 @@ export default ({ app }: { app: express.Application }) => {
         console.log("\nRequest @ /attestation/options");
         console.log("user >> ", req.body.username, req.body.displayName);
 
-        const extensions = { "example.extension": true };
+        const extensions = req.body.extensions;
         const attestationLogic = req.body.attestation == "direct" ? "direct" : "none";
         let username = userOps.formatUsername(req.body.username);
 

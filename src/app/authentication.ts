@@ -12,9 +12,6 @@ let auth: any;
 let sessionNonceCookie: string;
 let userVerification: any;
 
-let optionsRequestCounter = 0;
-let resultRequestCounter = 0;
-
 const allowCredentials = [
     {
         id: "rnInB99skrSHLwQJpAio3W2S5RMHGYGudqdobiUImDI",
@@ -36,7 +33,6 @@ export default ({ app }: { app: express.Application }) => {
     app.post("/assertion/options", async (req, res) => {
         console.log("\nRequest @ /assertion/options");
 
-        optionsRequestCounter += 1;
         sessionNonceCookie = "";
 
         // Client Id of the sample app.
@@ -92,7 +88,7 @@ export default ({ app }: { app: express.Application }) => {
              * Allow credentials are not required in the usernameless authentication.
              * According to spec, credentials are used when the user has to be identified.
              */
-            if (optionsRequestCounter == 1 && resultRequestCounter == 0) {
+            if (req.body?.username && req.body?.userVerification && req.body?.extensions) {
                 responseToTool.allowCredentials = allowCredentials;
             }
 
@@ -128,7 +124,7 @@ export default ({ app }: { app: express.Application }) => {
                  * Allow credentials are not required in the usernameless authentication.
                  * According to spec, credentials are used when the user has to be identified.
                  */
-                if (optionsRequestCounter == 1 && resultRequestCounter == 0) {
+                 if (req.body?.username && req.body?.userVerification && req.body?.extensions) {
                     responseToTool.allowCredentials = allowCredentials;
                 }
 
@@ -147,8 +143,6 @@ export default ({ app }: { app: express.Application }) => {
      */
     app.post("/assertion/result", async (req, res) => {
         console.log("\nRequest @ /assertion/result");
-
-        resultRequestCounter += 1;
 
         if (req.body.response?.authenticatorData) {
             try {
@@ -243,22 +237,6 @@ export default ({ app }: { app: express.Application }) => {
                 errorMessage: "",
                 status: "failed"
             });
-        });
-    });
-
-    /**
-     * Reset counters.
-     */
-    app.get("/adapter/counter/reset", async (req, res) => {
-        console.log("\nRequest @ /adapter/counter/reset");
-
-        optionsRequestCounter = 0;
-        resultRequestCounter = 0;
-
-        res.send({
-            message: "Options request counter = " + optionsRequestCounter + " | " + "Results request counter = "
-                + resultRequestCounter,
-            status: "success"
         });
     });
 };
